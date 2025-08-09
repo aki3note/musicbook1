@@ -22,7 +22,7 @@ COMPOSITE_IMAGE = Path("baackground.jpg")  # このチャットに添付され�
 # 音源URL（左上→右下の順で16コ）。あとでGitHubのmp3/oggに差し替えてください
 AUDIO_URLS = [
     None, None, None, None,
-    None, https://github.com/aki3note/musicbook1/blob/main/06.mp3, None, None,
+    None, "https://github.com/aki3note/musicbook1/blob/main/06.mp3", None, None,
     None, None, None, None,
     None, None, None, None,
 ]
