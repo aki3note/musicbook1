@@ -9,7 +9,7 @@ st.set_page_config(page_title="Picture Jukebox", page_icon="🎵", layout="cente
 # =========================
 
 # 1枚絵（ローカルorURL）— ローカルは同ディレクトリに置く想定
-BACKGROUND_IMAGE = "baackground.jpg"  # 例: "images/board.png" / "https://.../board.png"
+BACKGROUND_IMAGE = "https://github.com/aki3note/musicbook1/blob/main/baackground.jpg"  # 例: "images/board.png" / "https://.../board.png"
 
 # まずは 4x4 の規則的レイアウトを自動生成する場合
 ROWS, COLS = 4, 4
