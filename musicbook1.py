@@ -1,54 +1,47 @@
 import base64
+from urllib.parse import urlparse
 from pathlib import Path
 import streamlit as st
 
 st.set_page_config(page_title="Picture Jukebox", page_icon="🎵", layout="centered")
 
-# =========================
-# 設定（ここを差し替え）
-# =========================
+# ===== ユーザー指定（初期値） =====
+DEFAULT_IMAGE_URL = "https://github.com/aki3note/musicbook1/blob/main/baackground.jpg"
+DEFAULT_AUDIO_URL = "https://github.com/aki3note/musicbook1/blob/main/06.mp3"
 
-# 1枚絵（ローカルorURL）— ローカルは同ディレクトリに置く想定
-BACKGROUND_IMAGE = "https://github.com/aki3note/musicbook1/blob/main/baackground.jpg"  # 例: "images/board.png" / "https://.../board.png"
-
-# まずは 4x4 の規則的レイアウトを自動生成する場合
+# 盤面（この画像に合わせてだいたい良い感じに入る値。必要なら調整OK）
 ROWS, COLS = 4, 4
-# 画像内でグリッドが占める外枠（百分率）。上・左・幅・高さ
-# ↓この画像ならだいたい盤面の内側に合うよう仮置きしています。必要に応じて調整してください。
-GRID_BOUNDS = dict(top=16.5, left=4.5, width=91.0, height=77.0)
+GRID_BOUNDS = dict(top=16.5, left=4.5, width=91.0, height=77.0)  # % 単位
+CELL_GAP = 2.0        # タイル間隔（%）
+RADIUS = 12           # 角丸（デバッグ時の見た目用のみ）
 
-# 自動生成したホットスポットのサイズ・間隔（％）
-CELL_GAP = 2.0      # タイル同士のすき間（横縦とも）
-RADIUS = 12         # 見える枠の角丸（デバッグ用）
-
-# ▶ 後で1枚ずつ微調整したい場合は、下の HOTSPOTS_CUSTOM を使う
-# （top/left/width/height は全て画像に対する％。audio は mp3/ogg のURL）
-HOTSPOTS_CUSTOM = [
-    # {"label": "1", "audio": "https://raw.githubusercontent.com/you/repo/main/sounds/01.mp3",
-    #  "top": 18.0, "left": 6.0, "width": 20.0, "height": 17.0},
-]
-
-# デフォルト音源（未設定のときに入る値）
-DEFAULT_AUDIO = None  # "https://github.com/aki3note/musicbook1/blob/main/06.mp3"
-
-# =========================
-# ここから下はいじらなくてOK
-# =========================
+# ---------- ヘルパ ----------
+def to_raw_url(url: str) -> str:
+    """GitHubの blob URL を Raw URL に変換（その他はそのまま）。"""
+    if not url:
+        return ""
+    try:
+        parsed = urlparse(url)
+        if parsed.netloc == "github.com" and "/blob/" in parsed.path:
+            user_repo, branch_and_path = parsed.path.strip("/").split("/blob/", 1)
+            return f"https://raw.githubusercontent.com/{user_repo}/{branch_and_path}"
+        return url
+    except Exception:
+        return url
 
 def read_image_as_data_uri(src: str) -> str:
-    if src.startswith("http://") or src.startswith("https://"):
-        return src  # 直接URLで表示（CORS問題がある場合はローカル→Base64に）
+    # URLはそのまま表示。ローカルファイルならBase64に。
+    if src.startswith(("http://", "https://")):
+        return src
     p = Path(src)
-    mime = "image/png" if p.suffix.lower() in [".png"] else "image/jpeg"
+    mime = "image/png" if p.suffix.lower() == ".png" else "image/jpeg"
     data = p.read_bytes()
     b64 = base64.b64encode(data).decode("ascii")
     return f"data:{mime};base64,{b64}"
 
 def gen_grid_hotspots(rows, cols, bounds, gap=0.0):
-    """均等な矩形ホットスポットを%で生成。"""
     top = bounds["top"]; left = bounds["left"]
     W = bounds["width"]; H = bounds["height"]
-
     cell_w = (W - gap*(cols-1)) / cols
     cell_h = (H - gap*(rows-1)) / rows
 
@@ -61,37 +54,38 @@ def gen_grid_hotspots(rows, cols, bounds, gap=0.0):
             idx += 1
             spots.append({
                 "label": f"{idx:02}",
-                "audio": DEFAULT_AUDIO,   # 後で差し替え
-                "top": round(t, 4),
-                "left": round(l, 4),
-                "width": round(cell_w, 4),
-                "height": round(cell_h, 4),
+                "top": round(t, 4), "left": round(l, 4),
+                "width": round(cell_w, 4), "height": round(cell_h, 4),
             })
     return spots
 
-# 使うホットスポットを決定
-HOTSPOTS = HOTSPOTS_CUSTOM if HOTSPOTS_CUSTOM else gen_grid_hotspots(
-    ROWS, COLS, GRID_BOUNDS, CELL_GAP
-)
+# ---------- UI（サイドバー：画像＆16音源） ----------
+st.sidebar.header("設定")
+img_url = st.sidebar.text_input("画像URL（1枚絵）", value=DEFAULT_IMAGE_URL)
+img_url_raw = to_raw_url(img_url)
 
-# デバッグ表示（領域の枠線を表示）
-debug = st.toggle("領域を可視化（調整用）", value=False, help="ONにすると透明ボタンの枠が見えます")
+st.sidebar.markdown("**音源URL（16個）** — 空欄は未設定（無音）")
+audio_urls = []
+default_audio_raw = to_raw_url(DEFAULT_AUDIO_URL)
+for i in range(16):
+    val = st.sidebar.text_input(f"{i+1:02}", value=default_audio_raw if i == 0 else "")
+    audio_urls.append(to_raw_url(val.strip()))
 
-# 背景画像を data URI か URL として取得
-img_src = read_image_as_data_uri(BACKGROUND_IMAGE)
+debug = st.sidebar.toggle("領域を可視化（調整用）", value=False)
 
-# HTMLを埋め込み（絶対配置の透明ボタン＋audio）
+# ---------- ホットスポット作成 ----------
+HOTSPOTS = gen_grid_hotspots(ROWS, COLS, GRID_BOUNDS, CELL_GAP)
+
+# ---------- 埋め込みHTML ----------
+img_src = read_image_as_data_uri(img_url_raw or DEFAULT_IMAGE_URL)
+
 html = f"""
 <div id="stage" style="position:relative; max-width: 720px; margin: 0 auto;">
   <img src="{img_src}" style="width:100%; display:block;" alt="board"/>
-
-  <!-- オーディオプレイヤー（画面外） -->
   <audio id="player"></audio>
-
-  <!-- ホットスポット群 -->
 """
 for i, s in enumerate(HOTSPOTS):
-    audio = (s.get("audio") or "")  # 空文字なら無音
+    audio = audio_urls[i] if i < len(audio_urls) else ""
     outline = "1px dashed rgba(0,0,0,.35)" if debug else "none"
     bg = "rgba(0,0,0,.06)" if debug else "transparent"
     html += f"""
@@ -104,7 +98,7 @@ for i, s in enumerate(HOTSPOTS):
         a.play().catch(()=>{{}});
       }}
     }})()"
-    title="{s.get('label','')}"
+    title="{s['label']}"
     style="
       position:absolute;
       top:{s['top']}%;
@@ -124,12 +118,4 @@ html += "</div>"
 
 st.components.v1.html(html, height=820, scrolling=False)
 
-with st.expander("🔧 使い方メモ（音の割り当て・座標の調整）"):
-    st.markdown("""
-- **音源URLは Raw URL** を使ってください  
-  例）`https://raw.githubusercontent.com/<user>/<repo>/main/sounds/01.mp3`
-- まずは `GRID_BOUNDS` と `ROWS/COLS/CELL_GAP` でおおまかに合わせ、
-  細かく合わせたいタイルだけ `HOTSPOTS_CUSTOM` に手で1件ずつ書きます。
-- `top/left/width/height` は **画像に対する％** です。  
-  可視化トグルをONにすると、枠線が出て位置合わせがしやすくなります。
-""")
+st.caption("ヒント：GitHubのURLは **blob** ではなく **raw**（このアプリが自動で変換）を使うと安定して再生できます。")
