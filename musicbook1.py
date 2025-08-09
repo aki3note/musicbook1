@@ -29,7 +29,7 @@ HOTSPOTS_CUSTOM = [
 ]
 
 # デフォルト音源（未設定のときに入る値）
-DEFAULT_AUDIO = None  # "https://raw.githubusercontent.com/you/repo/main/sounds/blank.mp3"
+DEFAULT_AUDIO = None  # "https://github.com/aki3note/musicbook1/blob/main/06.mp3"
 
 # =========================
 # ここから下はいじらなくてOK
