@@ -1,151 +1,135 @@
-import io
+import base64
 from pathlib import Path
-from typing import List, Tuple
-
 import streamlit as st
-from PIL import Image
 
-st.set_page_config(page_title="Picture Jukebox", page_icon="🎵", layout="wide")
-
+st.set_page_config(page_title="Picture Jukebox", page_icon="🎵", layout="centered")
 
 # =========================
-# 設定（ここを後で差し替え）
+# 設定（ここを差し替え）
 # =========================
 
-# 4x4 グリッド想定（必要なら変更可）
+# 1枚絵（ローカルorURL）— ローカルは同ディレクトリに置く想定
+BACKGROUND_IMAGE = "baackground.jpg"  # 例: "images/board.png" / "https://.../board.png"
+
+# まずは 4x4 の規則的レイアウトを自動生成する場合
 ROWS, COLS = 4, 4
+# 画像内でグリッドが占める外枠（百分率）。上・左・幅・高さ
+# ↓この画像ならだいたい盤面の内側に合うよう仮置きしています。必要に応じて調整してください。
+GRID_BOUNDS = dict(top=16.5, left=4.5, width=91.0, height=77.0)
 
-# 合成画像のパス（デモ用）。あなたの画像URL/相対パスに差し替えてOK
-# 例: Path("assets/sprite.png") や "https://github.com/aki3note/musicbook1/blob/main/baackground.jpg?raw=true"
-COMPOSITE_IMAGE = Path("baackground.jpg")  # このチャットに添付された画像名
+# 自動生成したホットスポットのサイズ・間隔（％）
+CELL_GAP = 2.0      # タイル同士のすき間（横縦とも）
+RADIUS = 12         # 見える枠の角丸（デバッグ用）
 
-# 音源URL（左上→右下の順で16コ）。あとでGitHubのmp3/oggに差し替えてください
-AUDIO_URLS = [
-    None, None, None, None,
-    None, "https://github.com/aki3note/musicbook1/blob/main/06.mp3", None, None,
-    None, None, None, None,
-    None, None, None, None,
+# ▶ 後で1枚ずつ微調整したい場合は、下の HOTSPOTS_CUSTOM を使う
+# （top/left/width/height は全て画像に対する％。audio は mp3/ogg のURL）
+HOTSPOTS_CUSTOM = [
+    # {"label": "1", "audio": "https://raw.githubusercontent.com/you/repo/main/sounds/01.mp3",
+    #  "top": 18.0, "left": 6.0, "width": 20.0, "height": 17.0},
 ]
-# 例:
-# AUDIO_URLS = [
-#   "https://raw.githubusercontent.com/you/repo/main/sounds/01.mp3",
-#   "https://raw.githubusercontent.com/you/repo/main/sounds/02.mp3",
-#   ...
-# ]
 
-
-# 画像の中で「タイルが並ぶ領域」を切り出す枠（上, 右, 下, 左）px
-# 不要なら None（画像全体を等分）
-GRID_BOUNDS: Tuple[int, int, int, int] | None = None
-# 例: 上下左右に余白が多い場合 → GRID_BOUNDS = (220, 90, 120, 90)
-
+# デフォルト音源（未設定のときに入る値）
+DEFAULT_AUDIO = None  # "https://raw.githubusercontent.com/you/repo/main/sounds/blank.mp3"
 
 # =========================
-# ここから下は基本いじらなくてOK
+# ここから下はいじらなくてOK
 # =========================
 
-def load_image(src: str | Path) -> Image.Image:
-    """画像を読み込み（URL/ローカル両対応）。"""
-    src = str(src)
+def read_image_as_data_uri(src: str) -> str:
     if src.startswith("http://") or src.startswith("https://"):
-        import urllib.request
-        with urllib.request.urlopen(src) as resp:
-            return Image.open(io.BytesIO(resp.read())).convert("RGBA")
-    else:
-        return Image.open(src).convert("RGBA")
+        return src  # 直接URLで表示（CORS問題がある場合はローカル→Base64に）
+    p = Path(src)
+    mime = "image/png" if p.suffix.lower() in [".png"] else "image/jpeg"
+    data = p.read_bytes()
+    b64 = base64.b64encode(data).decode("ascii")
+    return f"data:{mime};base64,{b64}"
 
+def gen_grid_hotspots(rows, cols, bounds, gap=0.0):
+    """均等な矩形ホットスポットを%で生成。"""
+    top = bounds["top"]; left = bounds["left"]
+    W = bounds["width"]; H = bounds["height"]
 
-def crop_grid(img: Image.Image, rows: int, cols: int,
-              bounds: Tuple[int, int, int, int] | None = None) -> List[Image.Image]:
-    """画像を rows×cols で等分し、PIL Image のリストを返す。bounds で内側領域を指定可能。"""
-    W, H = img.size
-    if bounds:
-        top, right, bottom, left = bounds
-        x0, y0 = left, top
-        x1, y1 = W - right, H - bottom
-    else:
-        x0, y0, x1, y1 = 0, 0, W, H
+    cell_w = (W - gap*(cols-1)) / cols
+    cell_h = (H - gap*(rows-1)) / rows
 
-    grid_w = x1 - x0
-    grid_h = y1 - y0
-    tile_w = grid_w / cols
-    tile_h = grid_h / rows
-
-    tiles = []
+    spots = []
+    idx = 0
     for r in range(rows):
         for c in range(cols):
-            lx = int(x0 + c * tile_w)
-            ty = int(y0 + r * tile_h)
-            rx = int(x0 + (c + 1) * tile_w)
-            by = int(y0 + (r + 1) * tile_h)
-            tiles.append(img.crop((lx, ty, rx, by)))
-    return tiles
+            t = top + r * (cell_h + gap)
+            l = left + c * (cell_w + gap)
+            idx += 1
+            spots.append({
+                "label": f"{idx:02}",
+                "audio": DEFAULT_AUDIO,   # 後で差し替え
+                "top": round(t, 4),
+                "left": round(l, 4),
+                "width": round(cell_w, 4),
+                "height": round(cell_h, 4),
+            })
+    return spots
 
+# 使うホットスポットを決定
+HOTSPOTS = HOTSPOTS_CUSTOM if HOTSPOTS_CUSTOM else gen_grid_hotspots(
+    ROWS, COLS, GRID_BOUNDS, CELL_GAP
+)
 
-# 再生用の状態
-if "play_src" not in st.session_state:
-    st.session_state.play_src = None
+# デバッグ表示（領域の枠線を表示）
+debug = st.toggle("領域を可視化（調整用）", value=False, help="ONにすると透明ボタンの枠が見えます")
 
-st.title("🎵 画像タップで音を鳴らす（ブランク版）")
-st.caption("4×4の各タイルを押すと対応する音源を再生します。画像・音源は後でGitHubのURLに差し替えてOK。")
+# 背景画像を data URI か URL として取得
+img_src = read_image_as_data_uri(BACKGROUND_IMAGE)
 
-# 背景画像の読み込み & 分割
-try:
-    sprite = load_image(COMPOSITE_IMAGE)
-except Exception as e:
-    st.error(f"画像の読み込みに失敗しました: {e}")
-    st.stop()
+# HTMLを埋め込み（絶対配置の透明ボタン＋audio）
+html = f"""
+<div id="stage" style="position:relative; max-width: 720px; margin: 0 auto;">
+  <img src="{img_src}" style="width:100%; display:block;" alt="board"/>
 
-tiles = crop_grid(sprite, ROWS, COLS, GRID_BOUNDS)
+  <!-- オーディオプレイヤー（画面外） -->
+  <audio id="player"></audio>
 
-# スタイル：画像角丸＆ボタンをフル幅に
-st.markdown("""
-<style>
-.tile-img { border-radius: 14px; }
-.stButton>button { width:100%; border-radius: 12px; padding:.5rem .75rem; }
-.audio-hidden { height:0; overflow:hidden; }
-</style>
-""", unsafe_allow_html=True)
+  <!-- ホットスポット群 -->
+"""
+for i, s in enumerate(HOTSPOTS):
+    audio = (s.get("audio") or "")  # 空文字なら無音
+    outline = "1px dashed rgba(0,0,0,.35)" if debug else "none"
+    bg = "rgba(0,0,0,.06)" if debug else "transparent"
+    html += f"""
+  <button
+    onclick="(function(){{
+      var src = '{audio}';
+      if(src && src.trim().length > 0){{
+        var a = document.getElementById('player');
+        a.src = src;
+        a.play().catch(()=>{{}});
+      }}
+    }})()"
+    title="{s.get('label','')}"
+    style="
+      position:absolute;
+      top:{s['top']}%;
+      left:{s['left']}%;
+      width:{s['width']}%;
+      height:{s['height']}%;
+      border-radius:{RADIUS}px;
+      border:{outline};
+      background:{bg};
+      cursor:pointer;
+      padding:0;
+      outline:none;
+    ">
+  </button>
+"""
+html += "</div>"
 
-# グリッド描画（画像→ボタンの順）
-idx = 0
-for _ in range(ROWS):
-    cols = st.columns(COLS, vertical_alignment="center")
-    for c in cols:
-        with c:
-            # 画像表示
-            c.image(tiles[idx], use_container_width=True, output_format="PNG")
-            # ボタン（画像そのものを押せるように下にワイドなボタンを置く）
-            clicked = st.button("　", key=f"btn_{idx}")  # 見た目を空白に
-            if clicked:
-                # 音源をセット（None の場合は無音）
-                st.session_state.play_src = AUDIO_URLS[idx]
-        idx += 1
+st.components.v1.html(html, height=820, scrolling=False)
 
-# 再生（1度のインタラクションで最後に押したものだけ）
-def autoplay(src: str | None):
-    if not src:
-        return
-    st.markdown(
-        f"""
-        <div class="audio-hidden">
-            <audio autoplay>
-                <source src="{src}">
-            </audio>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-autoplay(st.session_state.play_src)
-
-with st.expander("🔧 セットアップ手順（超簡単）"):
+with st.expander("🔧 使い方メモ（音の割り当て・座標の調整）"):
     st.markdown("""
-1. 合成画像（4×4並び）を `COMPOSITE_IMAGE` に指定。URLでもOK。  
-2. 各タイルに対応する音源URLを **左上→右下** の順で `AUDIO_URLS` に並べます。  
-   - GitHubのRaw URL推奨（`https://raw.githubusercontent.com/.../sounds/xx.mp3`）  
-3. 画像の外周に大きな余白がある場合は `GRID_BOUNDS = (上, 右, 下, 左)` を設定すると
-   その内側をキレイに等分できます。  
-4. 列/行数を変える場合は `ROWS, COLS` を調整してください。
-    """)
-
+- **音源URLは Raw URL** を使ってください  
+  例）`https://raw.githubusercontent.com/<user>/<repo>/main/sounds/01.mp3`
+- まずは `GRID_BOUNDS` と `ROWS/COLS/CELL_GAP` でおおまかに合わせ、
+  細かく合わせたいタイルだけ `HOTSPOTS_CUSTOM` に手で1件ずつ書きます。
+- `top/left/width/height` は **画像に対する％** です。  
+  可視化トグルをONにすると、枠線が出て位置合わせがしやすくなります。
+""")
