@@ -3,43 +3,39 @@ from urllib.parse import urlparse
 from pathlib import Path
 import streamlit as st
 
-st.set_page_config(page_title="Picture Jukebox", page_icon="🎵", layout="centered")
+st.set_page_config(page_title="Picture Jukebox Fixed", page_icon="🎵", layout="centered")
 
-# ===== ユーザー指定（初期値） =====
-DEFAULT_IMAGE_URL = "https://github.com/aki3note/musicbook1/blob/main/baackground.jpg"
-DEFAULT_AUDIO_URL = "https://github.com/aki3note/musicbook1/blob/main/06.mp3"
-
-# 盤面（この画像に合わせてだいたい良い感じに入る値。必要なら調整OK）
+# ===== 基本設定 =====
 ROWS, COLS = 4, 4
 GRID_BOUNDS = dict(top=16.5, left=4.5, width=91.0, height=77.0)  # % 単位
-CELL_GAP = 2.0        # タイル間隔（%）
-RADIUS = 12           # 角丸（デバッグ時の見た目用のみ）
+CELL_GAP = 2.0   # タイル間隔（%）
+RADIUS = 12      # デバッグ時の角丸
 
-# ---------- ヘルパ ----------
+# ===== ヘルパ =====
 def to_raw_url(url: str) -> str:
-    """GitHubの blob URL を Raw URL に変換（その他はそのまま）。"""
+    """GitHubの blob URL → raw URL"""
     if not url:
         return ""
     try:
-        parsed = urlparse(url)
-        if parsed.netloc == "github.com" and "/blob/" in parsed.path:
-            user_repo, branch_and_path = parsed.path.strip("/").split("/blob/", 1)
+        p = urlparse(url)
+        if p.netloc == "github.com" and "/blob/" in p.path:
+            user_repo, branch_and_path = p.path.strip("/").split("/blob/", 1)
             return f"https://raw.githubusercontent.com/{user_repo}/{branch_and_path}"
         return url
     except Exception:
         return url
 
 def read_image_as_data_uri(src: str) -> str:
-    # URLはそのまま表示。ローカルファイルならBase64に。
+    """ローカル画像ならBase64化、URLならそのまま"""
     if src.startswith(("http://", "https://")):
         return src
     p = Path(src)
     mime = "image/png" if p.suffix.lower() == ".png" else "image/jpeg"
-    data = p.read_bytes()
-    b64 = base64.b64encode(data).decode("ascii")
+    b64 = base64.b64encode(p.read_bytes()).decode("ascii")
     return f"data:{mime};base64,{b64}"
 
 def gen_grid_hotspots(rows, cols, bounds, gap=0.0):
+    """均等配置のホットスポットを%単位で作る"""
     top = bounds["top"]; left = bounds["left"]
     W = bounds["width"]; H = bounds["height"]
     cell_w = (W - gap*(cols-1)) / cols
@@ -59,26 +55,24 @@ def gen_grid_hotspots(rows, cols, bounds, gap=0.0):
             })
     return spots
 
-# ---------- UI（サイドバー：画像＆16音源） ----------
-st.sidebar.header("設定")
-img_url = st.sidebar.text_input("画像URL（1枚絵）", value=DEFAULT_IMAGE_URL)
-img_url_raw = to_raw_url(img_url)
+# ===== 固定の画像・音源設定 =====
+img_url = to_raw_url("https://github.com/aki3note/musicbook1/blob/main/baackground.jpg")
 
-st.sidebar.markdown("**音源URL（16個）** — 空欄は未設定（無音）")
-audio_urls = []
-default_audio_raw = to_raw_url(DEFAULT_AUDIO_URL)
-for i in range(16):
-    val = st.sidebar.text_input(f"{i+1:02}", value=default_audio_raw if i == 0 else "")
-    audio_urls.append(to_raw_url(val.strip()))
+# 全部無音で初期化
+audio_urls = [""] * 16
+# 6番（インデックス5）
+audio_urls[5] = to_raw_url("https://github.com/aki3note/musicbook1/blob/main/06.mp3")
+# 14番（インデックス13）
+audio_urls[13] = to_raw_url("https://github.com/aki3note/musicbook1/blob/main/tanuki.wav")
 
-debug = st.sidebar.toggle("領域を可視化（調整用）", value=False)
+# デバッグ枠を表示するか
+debug = False
 
-# ---------- ホットスポット作成 ----------
+# ===== ホットスポット作成 =====
 HOTSPOTS = gen_grid_hotspots(ROWS, COLS, GRID_BOUNDS, CELL_GAP)
 
-# ---------- 埋め込みHTML ----------
-img_src = read_image_as_data_uri(img_url_raw or DEFAULT_IMAGE_URL)
-
+# ===== HTML埋め込み =====
+img_src = read_image_as_data_uri(img_url)
 html = f"""
 <div id="stage" style="position:relative; max-width: 720px; margin: 0 auto;">
   <img src="{img_src}" style="width:100%; display:block;" alt="board"/>
@@ -117,5 +111,6 @@ for i, s in enumerate(HOTSPOTS):
 html += "</div>"
 
 st.components.v1.html(html, height=820, scrolling=False)
+
 
 st.caption("ヒント：GitHubのURLは **blob** ではなく **raw**（このアプリが自動で変換）を使うと安定して再生できます。")
