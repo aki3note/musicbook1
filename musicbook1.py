@@ -61,7 +61,7 @@ img_url = to_raw_url("https://github.com/aki3note/musicbook1/blob/main/baackgrou
 # 全部無音で初期化
 audio_urls = [""] * 16
 # 2番（インデックス1）
-audio_urls[1] = to_raw_url("https://github.com/aki3note/musicbook1/blob/main/donguri.mid")
+audio_urls[1] = to_raw_url("https://github.com/aki3note/musicbook1/blob/main/donguri.wav")
 # 6番（インデックス5）
 audio_urls[5] = to_raw_url("https://github.com/aki3note/musicbook1/blob/main/06.mp3")
 # 14番（インデックス13）
