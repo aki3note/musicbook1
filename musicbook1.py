@@ -16,7 +16,7 @@ st.set_page_config(page_title="Picture Jukebox", page_icon="🎵", layout="wide"
 ROWS, COLS = 4, 4
 
 # 合成画像のパス（デモ用）。あなたの画像URL/相対パスに差し替えてOK
-# 例: Path("assets/sprite.png") や "https://raw.githubusercontent.com/<user>/<repo>/main/images/sprite.png"
+# 例: Path("assets/sprite.png") や "https://github.com/aki3note/musicbook1/blob/main/baackground.jpg?raw=true"
 COMPOSITE_IMAGE = Path("baackground.jpg")  # このチャットに添付された画像名
 
 # 音源URL（左上→右下の順で16コ）。あとでGitHubのmp3/oggに差し替えてください
