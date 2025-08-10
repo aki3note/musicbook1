@@ -72,6 +72,8 @@ audio_urls[5] = to_raw_url("https://github.com/aki3note/musicbook1/blob/main/aka
 audio_urls[6] = to_raw_url("https://github.com/aki3note/musicbook1/blob/main/koi.wav")
 # 10番（インデックス9）
 audio_urls[9] = to_raw_url("https://github.com/aki3note/musicbook1/blob/main/aru.wav")
+# 11番（インデックス10）
+audio_urls[10] = to_raw_url("https://github.com/aki3note/musicbook1/blob/main/ura.wav")
 # 14番（インデックス13）
 audio_urls[13] = to_raw_url("https://github.com/aki3note/musicbook1/blob/main/tanuki.wav")
 
