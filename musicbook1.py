@@ -1,6 +1,7 @@
 import base64
 from urllib.parse import urlparse
 from pathlib import Path
+import mimetypes
 import streamlit as st
 
 st.set_page_config(page_title="Picture Jukebox Fixed", page_icon="🎵", layout="centered")
@@ -9,7 +10,7 @@ st.set_page_config(page_title="Picture Jukebox Fixed", page_icon="🎵", layout=
 ROWS, COLS = 4, 4
 GRID_BOUNDS = dict(top=16.5, left=4.5, width=91.0, height=77.0)  # % 単位
 CELL_GAP = 2.0   # タイル間隔（%）
-RADIUS = 12      # デバッグ時の角丸
+RADIUS = 15      # デバッグ時の角丸
 
 # ===== ヘルパ =====
 def to_raw_url(url: str) -> str:
@@ -30,7 +31,9 @@ def read_image_as_data_uri(src: str) -> str:
     if src.startswith(("http://", "https://")):
         return src
     p = Path(src)
-    mime = "image/png" if p.suffix.lower() == ".png" else "image/jpeg"
+    mime, _ = mimetypes.guess_type(str(p))
+    if not mime:
+        mime = "application/octet-stream"
     b64 = base64.b64encode(p.read_bytes()).decode("ascii")
     return f"data:{mime};base64,{b64}"
 
@@ -56,15 +59,7 @@ def gen_grid_hotspots(rows, cols, bounds, gap=0.0):
     return spots
 
 # ===== 固定の画像・音源設定 =====
-img_url = to_raw_url("https://github.com/aki3note/musicbook1/blob/main/baackground.jpg")
-
-# 全部無音で初期化
-audio_urls = [""] * 16
-# 1番（インデックス0）
-audio_urls[0] = to_raw_url("https://github.com/aki3note/musicbook1/blob/main/inu.wav")
-# 2番（インデックス1）
-audio_urls[1] = to_raw_url("https://github.com/aki3note/musicbook1/blob/main/donguri.wav")
-# 5番（インデックス4）
+@@ -68,65 +71,65 @@ audio_urls[1] = to_raw_url("https://github.com/aki3note/musicbook1/blob/main/don
 audio_urls[4] = to_raw_url("https://github.com/aki3note/musicbook1/blob/main/kin.wav")
 # 6番（インデックス5）
 audio_urls[5] = to_raw_url("https://github.com/aki3note/musicbook1/blob/main/aka.wav")
@@ -90,7 +85,7 @@ HOTSPOTS = gen_grid_hotspots(ROWS, COLS, GRID_BOUNDS, CELL_GAP)
 # ===== HTML埋め込み =====
 img_src = read_image_as_data_uri(img_url)
 html = f"""
-<div id="stage" style="position:relative; max-width: 720px; margin: 0 auto;">
+<div id="stage" style="position:relative; max-width: 900px; margin: 0 auto;">
   <img src="{img_src}" style="width:100%; display:block;" alt="board"/>
   <audio id="player"></audio>
 """
@@ -126,7 +121,7 @@ for i, s in enumerate(HOTSPOTS):
 """
 html += "</div>"
 
-st.components.v1.html(html, height=820, scrolling=False)
+st.components.v1.html(html, height=1025, scrolling=False)
 
 
 st.caption("ヒント：GitHubのURLは **blob** ではなく **raw**（このアプリが自動で変換）を使うと安定して再生できます。")
