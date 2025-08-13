@@ -7,14 +7,9 @@ st.set_page_config(page_title="Picture Jukebox Fixed", page_icon="🎵", layout=
 
 # ===== 基本設定 =====
 ROWS, COLS = 4, 4
-GRID_BOUNDS = dict(
-    top=16.5 * 1.25,
-    left=4.5 * 1.25,
-    width=91.0 * 1.25,
-    height=77.0 * 1.25
-)  # % 単位
-CELL_GAP = 2.0 * 1.25   # タイル間隔（%）
-RADIUS = int(12 * 1.25)  # デバッグ時の角丸
+GRID_BOUNDS = dict(top=16.5, left=4.5, width=91.0, height=77.0)  # % 単位
+CELL_GAP = 2.0   # タイル間隔（%）
+RADIUS = 12      # デバッグ時の角丸
 
 # ===== ヘルパ =====
 def to_raw_url(url: str) -> str:
@@ -131,7 +126,7 @@ for i, s in enumerate(HOTSPOTS):
 """
 html += "</div>"
 
-st.components.v1.html(html, height=int(820 * 1.25), scrolling=False)
+st.components.v1.html(html, height=820, scrolling=False)
 
 
 st.caption("ヒント：GitHubのURLは **blob** ではなく **raw**（このアプリが自動で変換）を使うと安定して再生できます。")
