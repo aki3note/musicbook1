@@ -127,6 +127,3 @@ for i, s in enumerate(HOTSPOTS):
 html += "</div>"
 
 st.components.v1.html(html, height=820, scrolling=False)
-
-
-st.caption("ヒント：GitHubのURLは **blob** ではなく **raw**（このアプリが自動で変換）を使うと安定して再生できます。")
